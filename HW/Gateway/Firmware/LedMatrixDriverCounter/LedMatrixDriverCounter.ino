@@ -15,8 +15,8 @@ const int LEDMATRIX_WIDTH    = LEDMATRIX_SEGMENTS * 8;
 LEDMatrixDriver lmd(LEDMATRIX_SEGMENTS, LEDMATRIX_CS_PIN);
 
 // Marquee text
-//char text[] = "** LED MATRIX DEMO! ** (1234567890) ++ \"ABCDEFGHIJKLMNOPQRSTUVWXYZ\" ++ <$%/=?'.@,> --";
-char text[255];// = "";
+char text[] = " NORMAL ";
+//char text[255];// = "";
 
 // Marquee speed (lower nubmers = faster)
 const int ANIM_DELAY = 100;
@@ -102,16 +102,16 @@ byte font[95][8] = { {0, 0, 0, 0, 0, 0, 0, 0}, // SPACE
 void loop()
 {
   curMillis = millis();
-  if (curMillis - lastMillis > 1000) {
-    lastMillis = curMillis;
+  // if (curMillis - lastMillis > 1000) {
+  //   lastMillis = curMillis;
     
-    counter++;
-    String str = String(counter);
-    int str_len = str.length() + 1;
-    if (str_len > 250) str_len = 250;
-    str.toCharArray(text, str_len);
+  //   counter++;
+  //   String str = String(counter);
+  //   int str_len = str.length() + 1;
+  //   if (str_len > 250) str_len = 250;
+  //   str.toCharArray(text, str_len);
 
-  }
+  // }
 
   // Draw the text to the current position
   int len = strlen(text);
@@ -120,14 +120,14 @@ void loop()
 
   // Toggle display of the new framebuffer
   lmd.display();
-//
-//  // Wait to let the human read the display
-//  delay(ANIM_DELAY);
-//
-//  // Advance to next coordinate
-//  if ( --x < len * -8 ) {
-//    x = LEDMATRIX_WIDTH;
-//  }
+
+ // Wait to let the human read the display
+ delay(ANIM_DELAY);
+
+ // Advance to next coordinate
+ if ( --x < len * -8 ) {
+   x = LEDMATRIX_WIDTH;
+ }
 }
 
 
