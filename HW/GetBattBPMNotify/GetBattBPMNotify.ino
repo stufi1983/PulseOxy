@@ -19,6 +19,7 @@ BLERemoteCharacteristic* pBatteryLevelCharacteristic;
 BLERemoteCharacteristic* pHeartRateCharacteristic;
 
 bool deviceFound = false;
+bool doReconnect = false;
 
 class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
   void onResult(BLEAdvertisedDevice advertisedDevice) {
@@ -31,7 +32,7 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
 };
 
 void connectToDevice();
-
+void scanBLEDev();
 class MyClientCallback : public BLEClientCallbacks {
   void onConnect(BLEClient* pClient) {
     Serial.println("Connected to server.");
@@ -41,12 +42,20 @@ class MyClientCallback : public BLEClientCallbacks {
   void onDisconnect(BLEClient* pClient) {
     Serial.println("Disconnected from server.");
     isConnected = false;
-
+    doReconnect = true;  // Set a flag to attempt reconnection in the loop
+    deviceFound = false;
     // Optionally start reconnection attempts
     while (!isConnected) {
       Serial.println("Attempting to reconnect...");
-      connectToDevice();
+      scanBLEDev();
+      if (deviceFound) {
+        Serial.println("Dev found");
+        connectToDevice();
+      } else {
+        Serial.println("Dev not found");
+      }
       delay(5000);  // Wait before trying to reconnect
+      Serial.println("Wait....");
     }
   }
 };
@@ -99,8 +108,9 @@ void connectToDevice() {
     }
   } else {
     Serial.println("Target device not found.");
+    isConnected = false;
+    doReconnect = true;
   }
-  delay(5000);  // Wait before trying to reconnect
 }
 
 
@@ -129,16 +139,19 @@ void notifyCallback(BLERemoteCharacteristic* pCharacteristic, uint8_t* pData, si
   }
 }
 
-
-void setup() {
-  Serial.begin(115200);
-  BLEDevice::init("");  // Initialize BLE
+void scanBLEDev() {
   Serial.println("Starting BLE scan...");
-
   BLEScan* pScan = BLEDevice::getScan();  // Create BLE scan object
   pScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
   pScan->setActiveScan(true);      // Active scan uses more power, but gets results faster
   pScan->start(SCAN_TIME, false);  // Scan for SCAN_TIME seconds
+}
+
+void setup() {
+  Serial.begin(115200);
+  BLEDevice::init("");  // Initialize BLE
+
+  scanBLEDev();
 
   connectToDevice();
 }
@@ -153,6 +166,22 @@ void loop() {
     //   connectToDevice();
     // }
     if (isConnected) { readBatteryLevel(); }
+  }
+
+  if (deviceFound) {
+    if (doReconnect && !isConnected) {
+      Serial.println("Reconnecting...");
+
+      // Delete and recreate BLE client
+      //delete pClient;
+      //connectToDevice();
+
+      doReconnect = false;  // Reset the reconnection flag
+    }
+  } else {
+    Serial.println("Devi not found");
+     scanBLEDev();
+     delay(5000);
   }
 }
 void readBatteryLevel() {
