@@ -28,6 +28,8 @@ unsigned long previousMillis = 0;
 class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
   void onResult(BLEAdvertisedDevice advertisedDevice) {
     //if (advertisedDevice.getName() == "ZL02D") {
+    Serial.println(advertisedDevice.getName() + " " + advertisedDevice.getAddress().toString());
+
     if (advertisedDevice.getAddress().toString() == DEVICE_ADDRESS) {
       String DevAddress = advertisedDevice.getAddress().toString();
       Serial.println("Found target BLE device.");
@@ -106,7 +108,11 @@ void connectToDevice() {
     Serial.println("Failed to connect.");
     pClient->disconnect();
     delete pClient;
+
+    isConnected = false;
     doReconnect = true;
+    deviceFound = false;
+    delay(1000);  // Delay before reconnect attempt
   }
 }
 
