@@ -7,6 +7,9 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
+#include <esp_task_wdt.h>
+
+
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1  // No reset pin for OLED
@@ -306,6 +309,18 @@ void setup() {
     connectToDevice();
     doReconnect = false;
   }
+    // Initialize the watchdog timer
+// Create the watchdog configuration
+  esp_task_wdt_config_t wdt_config = {
+    .timeout_ms = 60000,  // 60 seconds timeout
+    .idle_core_mask = 0,  // No idle core is masked
+    .trigger_panic = true // Trigger a panic and reset on timeout
+  };
+
+  // Initialize the watchdog timer with the configuration
+  esp_task_wdt_init(&wdt_config);
+    esp_task_wdt_add(NULL);       // Add current thread to the watchdog timer
+
 }
 
 unsigned long previousOLMillis = 0;
@@ -396,6 +411,9 @@ void loop() {
       }
     }
   }
+
+   // Reset the watchdog timer
+  esp_task_wdt_reset();
 }
 
 void readBatteryLevel() {
