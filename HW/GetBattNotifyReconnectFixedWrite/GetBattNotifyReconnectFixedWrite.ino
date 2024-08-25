@@ -3,7 +3,7 @@
 #include <BLEScan.h>
 #include <BLEClient.h>
 
-#define READ_INTERVAL 60000 //more than 30000 (time for measurement)
+#define READ_INTERVAL 60000  //more than 30000 (time for measurement)
 
 #define DEVICE_ADDRESS "f5:bc:47:6b:0b:34"  //f5:bc:47:6b:0b:34 --> convert to string became lowercase
 
@@ -12,6 +12,8 @@
 
 #define MEASUREMENT_SERVICE_UUID "FEEA"
 #define MEASUREMENT_NOTIFICATION_UUID "FEE3"
+
+#define HEART_RATE_MEASUREMENT_UUID "2A37"
 
 #define SCAN_TIME 5
 #define SCAN_TIMEOUT 15000      // Maximum scan duration in milliseconds (15 seconds)
@@ -24,6 +26,7 @@ BLEClient* pClient;
 BLERemoteCharacteristic* pCharacteristic;
 BLERemoteCharacteristic* pBatteryLevelCharacteristic;
 BLERemoteCharacteristic* pHeartRateCharacteristic;
+BLERemoteCharacteristic* pHeartRateNotify;
 
 bool deviceFound = false;
 bool doReconnect = false;
@@ -165,6 +168,23 @@ void connectToDevice() {
       Serial.println("Failed to find service.");
     }
 
+    BLERemoteService* pService3 = pClient->getService(BLEUUID("180D"));  // Device Notify Service UUID
+    if (pService3 != nullptr) {
+      pHeartRateNotify = pService3->getCharacteristic(HEART_RATE_MEASUREMENT_UUID);
+      if (pHeartRateNotify != nullptr) {
+        isConnected = true;
+        Serial.println("Heart Rate Characteristic found.");
+        if (pHeartRateCharacteristic->canNotify()) {
+          pHeartRateNotify->registerForNotify(pHeartRateNotify_notifyCallback);  // Register for notifications
+        }
+      } else {
+        Serial.println("Heart Rate Characteristic not found.");
+      }
+      //pClient->disconnect();
+    } else {
+      Serial.println("Heart Rate service not found.");
+    }
+
     isConnected = true;
 
   } else {
@@ -174,6 +194,13 @@ void connectToDevice() {
     doReconnect = true;
     isConnected = false;
     deviceFound = false;
+  }
+}
+
+void pHeartRateNotify_notifyCallback(BLERemoteCharacteristic* pCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
+  if (length > 0) {
+    curHeartRate = pData[1];  // Heart rate is usually the second byte
+    Serial.printf("Heart Rate: %d bpm\n", curHeartRate);
   }
 }
 
@@ -201,9 +228,9 @@ Handle: 0x0020 (Swirl Networks, Inc.: Anki, Inc.)
 */
 void writeValueToCharacteristic(uint8_t type) {
   if (isConnected && pCharacteristic != nullptr) {
-    uint8_t value3[] = { 0xfe, 0xea, 0x20, 0x06, 0x6b, 0x00 };  // Hex representation of feea20066b00 SPO2
-    uint8_t value2[] = { 0xfe, 0xea, 0x20, 0x06, 0x6d, 0x00 };  // Hex representation of feea20066d00 Heart Rate
-    uint8_t value1[] = { 0xfe, 0xea, 0x20, 0x08, 0x69, 0x00 };  // Hex representation of fe ea 20 08 69 00 00 00 Blood Pressure
+    uint8_t value1[] = { 0xfe, 0xea, 0x20, 0x06, 0x6b, 0x00 };  // Hex representation of feea20066b00 SPO2
+    uint8_t value2[] = { 0xfe, 0xea, 0x20, 0x08, 0x69, 0x00 };  // Hex representation of fe ea 20 08 69 00 00 00 Blood Pressure
+    uint8_t value3[] = { 0xfe, 0xea, 0x20, 0x06, 0x6d, 0x00 };  // Hex representation of feea20066d00 Heart Rate
 
     if (pCharacteristic->canWrite()) {
       //Serial.println("Characteristic can write.");
@@ -213,9 +240,15 @@ void writeValueToCharacteristic(uint8_t type) {
       Serial.println("Characteristic unwritable.");
       return;
     }
-    if (type == 0) pCharacteristic->writeValue(value1, sizeof(value1), false);       // Write without response
-    else if (type == 1) pCharacteristic->writeValue(value2, sizeof(value2), false);  // Write without response
-    else if (type == 2) pCharacteristic->writeValue(value3, sizeof(value3), false);  // Write without response
+    if (type == 0) {
+      pCharacteristic->writeValue(value1, sizeof(value1), false);  // Write without response
+    } else if (type == 1) {
+      pCharacteristic->writeValue(value2, sizeof(value2), false);  // Write without response
+      //curSistole = 0;                                                                  //reset value
+    }
+    //else if (type == 2) pCharacteristic->writeValue(value3, sizeof(value3), false);  // Write without response, heart rate service avail, get notift form hr service, nodot need request
+    else
+      return;
 
   } else {
     Serial.println("Not connected to the characteristic.");
@@ -232,26 +265,33 @@ void setup() {
   }
 }
 
-
+unsigned long previousOLMillis = 0;
 
 void loop() {
+  unsigned long currentOLMillis = millis();
+
+  // Check if 1 second has passed
+  if (currentOLMillis - previousOLMillis >= 1000) {
+    previousOLMillis = currentOLMillis;
+    Serial.println("BP:" + String(curSistole) + "/" + String(curDiastole) + " HR:" + String(curHeartRate) + " O2:" + String(curSPO2));
+  }
 
   unsigned long currentMillis = millis();
 
   if (currentMillis - previousMillis >= 30000) {  //first measurement, 15 s time to response
     if (isConnected) {
       //no measuring yet
-      if (curSistole == 0) {
+      if (curSPO2 == 0) {
+        previousMillis = currentMillis;
+        Serial.println("First SPO value");
+        writeValueToCharacteristic(0);
+      } else if (curSistole == 0) {
         previousMillis = currentMillis;
         Serial.println("First BP value");
-        writeValueToCharacteristic(0);
+        writeValueToCharacteristic(1);
       } else if (curHeartRate == 0) {
         previousMillis = currentMillis;
         Serial.println("First HR value");
-        writeValueToCharacteristic(1);
-      } else if (curSPO2 == 0) {
-        previousMillis = currentMillis;
-        Serial.println("First SPO2 value");
         writeValueToCharacteristic(2);
       }
     }
@@ -270,7 +310,7 @@ void loop() {
         if (MICounter >= MEASUREMENT_INTERVAL) {
           MICounter = 0;  //reset
           if (type > 2) type = 0;
-          //Serial.println(type);
+          Serial.println("Read" + String(type));
           writeValueToCharacteristic(type);
           type++;
         }
