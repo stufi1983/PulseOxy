@@ -45,7 +45,7 @@ bool deviceFound = false;
 bool doReconnect = false;
 bool isConnected = false;
 bool tickkMark = false;
-
+bool isCharged = true;
 bool inbody = false;
 uint8_t MICounter = 0;  //MEASUREMENT_INTERVAL counter
 
@@ -269,7 +269,7 @@ void writeValueToCharacteristic(uint8_t type) {
   }
 }
 
-uint8_t dsistole = 0; //dont diaplay 0
+uint8_t dsistole = 0;  //dont diaplay 0
 void displayOLED() {
   if (curSistole != 0)
     dsistole = curSistole;
@@ -277,7 +277,8 @@ void displayOLED() {
   display.clearDisplay();
 
   display.setCursor(0, 0);
-  if(tickkMark) display.print("#"); else display.print(" "); 
+  if (tickkMark) display.print("#");
+  else display.print(" ");
   display.print("Batt " + String(curBatteryLevel) + " %\n");
   display.print("O2:" + String(curSPO2) + " %\n");
   display.print("BP:" + String(dsistole) + "/" + String(curDiastole) + "\n");
@@ -309,18 +310,17 @@ void setup() {
     connectToDevice();
     doReconnect = false;
   }
-    // Initialize the watchdog timer
-// Create the watchdog configuration
+  // Initialize the watchdog timer
+  // Create the watchdog configuration
   esp_task_wdt_config_t wdt_config = {
-    .timeout_ms = 60000,  // 60 seconds timeout
-    .idle_core_mask = 0,  // No idle core is masked
-    .trigger_panic = true // Trigger a panic and reset on timeout
+    .timeout_ms = 60000,   // 60 seconds timeout
+    .idle_core_mask = 0,   // No idle core is masked
+    .trigger_panic = true  // Trigger a panic and reset on timeout
   };
 
   // Initialize the watchdog timer with the configuration
   esp_task_wdt_init(&wdt_config);
-    esp_task_wdt_add(NULL);       // Add current thread to the watchdog timer
-
+  esp_task_wdt_add(NULL);  // Add current thread to the watchdog timer
 }
 
 unsigned long previousOLMillis = 0;
@@ -339,7 +339,7 @@ void loop() {
   unsigned long currentMillis = millis();
 
   if (currentMillis - previousMillis >= 30000) {  //first measurement, 15 s time to response
-    if (isConnected) {
+    if (isConnected && !isCharged) {
       //no measuring yet
       if (curSPO2 == 0) {
         previousMillis = currentMillis;
@@ -354,6 +354,11 @@ void loop() {
         Serial.println("First HR value");
         writeValueToCharacteristic(2);
       }
+    }
+    if (isCharged) {
+      previousMillis = currentMillis;
+      Serial.println("Charging, no measurement!");
+      readBatteryLevel();
     }
   }
 
@@ -412,7 +417,7 @@ void loop() {
     }
   }
 
-   // Reset the watchdog timer
+  // Reset the watchdog timer
   esp_task_wdt_reset();
 }
 
@@ -423,7 +428,9 @@ void readBatteryLevel() {
       if (batteryLevel <= 100) {
         Serial.printf("Battery Level: %d%%\n", batteryLevel);
         curBatteryLevel = batteryLevel;
+        isCharged = false;
       } else {
+        isCharged = true;
         Serial.printf("Battery is being charged\n");
       }
     } else {
