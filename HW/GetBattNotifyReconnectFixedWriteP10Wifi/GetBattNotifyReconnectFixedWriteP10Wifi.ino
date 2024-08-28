@@ -355,7 +355,7 @@ void setup() {
   Serial1.begin(115200, SERIAL_8N1, RXD1, TXD1);
   Serial2.begin(1200, SERIAL_8N1, RXD2, TXD2);
 
-  Serial1.println("Thisis ates");
+  //Serial1.println("Thisis ates");
 
   BLEDevice::init("");
   scanBLEDev();
@@ -379,23 +379,34 @@ void setup() {
 
 
 void sendJsonSerial() {
-  // Allocate the JSON document
-  JsonDocument doc;
+  const size_t capacity = JSON_OBJECT_SIZE(7);  // Optimize memory allocation for 7 key-value pairs
+
+  // Allocate the JSON document with a defined capacity
+  StaticJsonDocument<capacity> doc;
+
 
   // Add values in the document
-  doc["sensor"] = "gps";
-  doc["time"] = 1351824120;
+  doc["dev"] = DEVICE_ADDRESS;
+  doc["bat"] = curBatteryLevel;
+  doc["sis"] = dsistole;
+  doc["dia"] = curDiastole;
+  doc["hrr"] = curHeartRate;
+  doc["spo"] = curSPO2;
+  doc["kon"] = sehat;
+  doc["con"] = isConnected;
 
-  // Add an array
-  JsonArray data = doc["data"].to<JsonArray>();
-  data.add(48.756080);
-  data.add(2.302038);
+  // // Add an array
+  // JsonArray data = doc["data"].to<JsonArray>();
+  // data.add(48.756080);
+  // data.add(2.302038);
 
   // Generate the minified JSON and send it to the Serial port
   serializeJson(doc, Serial1);
+  Serial1.println();
 }
 
 unsigned long previousOLMillis = 0;
+unsigned long previousJSONMillis = 0;
 
 void loop() {
   byte RxData;
@@ -405,13 +416,21 @@ void loop() {
     Serial.write(RxData);
   }
 
+  unsigned long currentJSONMillis = millis();
+  if (currentJSONMillis - previousJSONMillis >= 60000) {
+    previousJSONMillis = currentJSONMillis;
+    if (curSPO2 > 0 && curHeartRate > 0 && curSistole > 0) {
+      sendJsonSerial();
+    }
+  }
+
   unsigned long currentOLMillis = millis();
 
   // Check if 3 second has passed
   if (currentOLMillis - previousOLMillis >= 3000) {
     previousOLMillis = currentOLMillis;
     tickkMark = !tickkMark;
-    Serial.println("BP:" + String(curSistole) + "/" + String(curDiastole) + " HR:" + String(curHeartRate) + " O2:" + String(curSPO2));
+    //Serial.println("BP:" + String(curSistole) + "/" + String(curDiastole) + " HR:" + String(curHeartRate) + " O2:" + String(curSPO2));
     displayP10();
     P10Mode++;
     if (P10Mode > 4) P10Mode = 0;
@@ -447,7 +466,7 @@ void loop() {
     previousMillis = currentMillis;
     MICounter++;
     Serial.println("Loop");
-    sendJsonSerial();
+
     if (isConnected) {
       readBatteryLevel();
       if (curBatteryLevel > 5) {
