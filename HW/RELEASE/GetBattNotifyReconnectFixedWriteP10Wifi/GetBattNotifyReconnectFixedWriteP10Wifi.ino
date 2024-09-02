@@ -331,10 +331,10 @@ void displayP10() {
       if (curP10Mode == P10Mode) return;
       curP10Mode = P10Mode;
       if (curHeartRate > 50 && curHeartRate < 100) {
-        stat = "Detak Jantung Normal";
+        stat = "DetakJantung Normal";
         //sehat = true;
       } else {
-        stat = "Detak jantung berbahaya";
+        stat = "Detakjantung berbahaya";
         sehat = false;
       }
       Serial2.println(stat + ":" + " " + String(curHeartRate) + " BPM");
